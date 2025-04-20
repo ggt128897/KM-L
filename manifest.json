@@ -1,7 +1,7 @@
 {
   "name": "油耗追蹤器 FINAL",
-  "short_name": "油耗追蹤",
-  "start_url": "fuel_tracker_final.html",
+  "short_name": "油耗追蹤器",
+  "start_url": ".",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#4CAF50",
