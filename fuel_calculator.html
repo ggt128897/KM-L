@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>油耗追蹤器 FINAL</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#4CAF50">
+  <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: auto; padding: 20px; }
+    input, button { padding: 8px; margin: 5px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    #chart_div { margin-top: 30px; }
+    @media (max-width: 600px) {
+      input, button { width: 100%; box-sizing: border-box; }
+    }
+  </style>
+</head>
+<body>
+
+<h2>汽車油耗追蹤器 FINAL</h2>
+
+<label>日期:</label>
+<input type="date" id="date"><br>
+
+<label>行駛距離（公里）:</label>
+<input type="number" id="distance" placeholder="如 350"><br>
+
+<label>加油量（公升）:</label>
+<input type="number" id="fuel" placeholder="如 25"><br>
+
+<label>加油金額（元）:</label>
+<input type="number" id="amount" placeholder="如 800"><br>
+
+<label>油價（元/公升）:</label>
+<input type="number" id="price" placeholder="如 31.5"><br>
+
+<button onclick="calculate()">新增紀錄</button>
+<button onclick="exportCSV()">匯出CSV</button>
+<button onclick="importCSV()">匯入CSV</button>
+<input type="file" id="csvFile" accept=".csv" style="display:none" onchange="handleImport(event)">
+<button onclick="clearData()">清除所有資料</button>
+
+<h3>結果：</h3>
+<p id="result"></p>
+<p id="average"></p>
+
+<h3>歷史紀錄</h3>
+<table id="historyTable">
+  <tr><th>#</th><th>日期</th><th>公里</th><th>公升</th><th>km/L</th><th>L/100km</th><th>$/km</th></tr>
+</table>
+
+<div id="chart_div" style="height: 400px;"></div>
+
+<script>
+  let history = JSON.parse(localStorage.getItem("fuelHistory")) || [];
+  google.charts.load('current', {packages: ['corechart']});
+  google.charts.setOnLoadCallback(drawChart);
+
+  function calculate() {
+    const date = document.getElementById('date').value || new Date().toISOString().split("T")[0];
+    const distance = parseFloat(document.getElementById('distance').value);
+    const fuel = parseFloat(document.getElementById('fuel').value);
+    const amount = parseFloat(document.getElementById('amount').value);
+    const price = parseFloat(document.getElementById('price').value);
+
+    if (distance > 0 && fuel > 0) {
+      const kmPerL = parseFloat((distance / fuel).toFixed(2));
+      const LPer100km = parseFloat(((fuel / distance) * 100).toFixed(2));
+      let costPerKm = null;
+
+      if (amount) costPerKm = parseFloat((amount / distance).toFixed(2));
+      else if (price) costPerKm = parseFloat(((price * fuel) / distance).toFixed(2));
+
+      history.push({ date, distance, fuel, kmPerL, LPer100km, costPerKm });
+      localStorage.setItem("fuelHistory", JSON.stringify(history));
+      updateTable();
+      drawChart();
+      calculateAverages();
+
+      document.getElementById('result').innerHTML = `每公升可行駛：<b>${kmPerL} km/L</b><br>
+        每百公里耗油：<b>${LPer100km} L/100km</b><br>
+        每公里成本：<b>${costPerKm !== null ? '$' + costPerKm : '-'}</b>`;
+    }
+  }
+
+  function updateTable() {
+    const table = document.getElementById('historyTable');
+    table.innerHTML = "<tr><th>#</th><th>日期</th><th>公里</th><th>公升</th><th>km/L</th><th>L/100km</th><th>$/km</th></tr>";
+    history.forEach((r, i) => {
+      table.innerHTML += `<tr>
+        <td>${i + 1}</td>
+        <td>${r.date}</td>
+        <td>${r.distance}</td>
+        <td>${r.fuel}</td>
+        <td>${r.kmPerL}</td>
+        <td>${r.LPer100km}</td>
+        <td>${r.costPerKm !== null ? '$' + r.costPerKm : '-'}</td>
+      </tr>`;
+    });
+  }
+
+  function drawChart() {
+    const data = new google.visualization.DataTable();
+    data.addColumn('string', '日期');
+    data.addColumn('number', 'km/L');
+    history.forEach(r => data.addRow([r.date, r.kmPerL]));
+
+    const chart = new google.visualization.LineChart(document.getElementById('chart_div'));
+    chart.draw(data, {
+      title: '油耗效率變化圖（km/L）',
+      hAxis: { title: '日期' },
+      vAxis: { title: 'km/L' },
+      curveType: 'function',
+      legend: { position: 'none' }
+    });
+  }
+
+  function calculateAverages() {
+    if (!history.length) return;
+    const avgKmPerL = (history.reduce((sum, r) => sum + r.kmPerL, 0) / history.length).toFixed(2);
+    const avgLPer100km = (history.reduce((sum, r) => sum + r.LPer100km, 0) / history.length).toFixed(2);
+    document.getElementById("average").innerHTML = `平均油耗：<b>${avgKmPerL} km/L</b>，<b>${avgLPer100km} L/100km</b>`;
+  }
+
+  function clearData() {
+    if (confirm("確定要清除所有資料嗎？")) {
+      history = [];
+      localStorage.removeItem("fuelHistory");
+      updateTable();
+      drawChart();
+      document.getElementById("result").innerHTML = '';
+      document.getElementById("average").innerHTML = '';
+    }
+  }
+
+  function exportCSV() {
+    let csv = "日期,公里,公升,km/L,L/100km,$/km\n";
+    history.forEach(r => {
+      csv += `${r.date},${r.distance},${r.fuel},${r.kmPerL},${r.LPer100km},${r.costPerKm || ''}\n`;
+    });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "fuel_history.csv";
+    link.click();
+  }
+
+  function importCSV() {
+    document.getElementById('csvFile').click();
+  }
+
+  function handleImport(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      const lines = e.target.result.split('\n').slice(1);
+      lines.forEach(line => {
+        const [date, distance, fuel, kmPerL, LPer100km, costPerKm] = line.split(',');
+        if (date && distance) {
+          history.push({
+            date,
+            distance: parseFloat(distance),
+            fuel: parseFloat(fuel),
+            kmPerL: parseFloat(kmPerL),
+            LPer100km: parseFloat(LPer100km),
+            costPerKm: costPerKm ? parseFloat(costPerKm) : null
+          });
+        }
+      });
+      localStorage.setItem("fuelHistory", JSON.stringify(history));
+      updateTable();
+      drawChart();
+      calculateAverages();
+    };
+    reader.readAsText(file);
+  }
+
+  // 初始載入
+  updateTable();
+  drawChart();
+  calculateAverages();
+
+  // Service Worker 註冊
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('service-worker.js')
