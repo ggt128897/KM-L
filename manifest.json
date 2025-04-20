@@ -1,0 +1,20 @@
+{
+  "name": "油耗追蹤器 FINAL",
+  "short_name": "油耗追蹤",
+  "start_url": "fuel_tracker_final.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4CAF50",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
