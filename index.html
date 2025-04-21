@@ -55,10 +55,13 @@
 <div id="chart_div" style="height: 400px;"></div>
 
 <script>
-  let history = JSON.parse(localStorage.getItem("fuelHistory")) || [];
+  let history = JSON.parse(localStorage.getItem("fuelHistory"));
+  history = Array.isArray(history) ? history : [];
+  
   google.charts.load('current', {packages: ['corechart']});
   google.charts.setOnLoadCallback(drawChart);
 
+  // 計算油耗數據
   function calculate() {
     const date = document.getElementById('date').value || new Date().toISOString().split("T")[0];
     const distance = parseFloat(document.getElementById('distance').value);
@@ -66,26 +69,31 @@
     const amount = parseFloat(document.getElementById('amount').value);
     const price = parseFloat(document.getElementById('price').value);
 
-    if (distance > 0 && fuel > 0) {
-      const kmPerL = parseFloat((distance / fuel).toFixed(2));
-      const LPer100km = parseFloat(((fuel / distance) * 100).toFixed(2));
-      let costPerKm = null;
-
-      if (amount) costPerKm = parseFloat((amount / distance).toFixed(2));
-      else if (price) costPerKm = parseFloat(((price * fuel) / distance).toFixed(2));
-
-      history.push({ date, distance, fuel, kmPerL, LPer100km, costPerKm });
-      localStorage.setItem("fuelHistory", JSON.stringify(history));
-      updateTable();
-      drawChart();
-      calculateAverages();
-
-      document.getElementById('result').innerHTML = `每公升可行駛：<b>${kmPerL} km/L</b><br>
-        每百公里耗油：<b>${LPer100km} L/100km</b><br>
-        每公里成本：<b>${costPerKm !== null ? '$' + costPerKm : '-'}</b>`;
+    // 檢查輸入
+    if (isNaN(distance) || isNaN(fuel) || distance <= 0 || fuel <= 0) {
+      alert("請確保行駛距離和加油量是正確的數字");
+      return;
     }
+
+    const kmPerL = parseFloat((distance / fuel).toFixed(2));
+    const LPer100km = parseFloat(((fuel / distance) * 100).toFixed(2));
+    let costPerKm = null;
+
+    if (amount) costPerKm = parseFloat((amount / distance).toFixed(2));
+    else if (price) costPerKm = parseFloat(((price * fuel) / distance).toFixed(2));
+
+    history.push({ date, distance, fuel, kmPerL, LPer100km, costPerKm });
+    localStorage.setItem("fuelHistory", JSON.stringify(history));
+    updateTable();
+    drawChart();
+    calculateAverages();
+
+    document.getElementById('result').innerHTML = `每公升可行駛：<b>${kmPerL} km/L</b><br>
+      每百公里耗油：<b>${LPer100km} L/100km</b><br>
+      每公里成本：<b>${costPerKm !== null ? '$' + costPerKm : '-'}</b>`;
   }
 
+  // 更新歷史紀錄表格
   function updateTable() {
     const table = document.getElementById('historyTable');
     table.innerHTML = "<tr><th>#</th><th>日期</th><th>公里</th><th>公升</th><th>km/L</th><th>L/100km</th><th>$/km</th></tr>";
@@ -102,7 +110,10 @@
     });
   }
 
+  // 畫圖
   function drawChart() {
+    if (history.length === 0) return;
+
     const data = new google.visualization.DataTable();
     data.addColumn('string', '日期');
     data.addColumn('number', 'km/L');
@@ -118,6 +129,7 @@
     });
   }
 
+  // 計算平均值
   function calculateAverages() {
     if (!history.length) return;
     const avgKmPerL = (history.reduce((sum, r) => sum + r.kmPerL, 0) / history.length).toFixed(2);
@@ -125,6 +137,7 @@
     document.getElementById("average").innerHTML = `平均油耗：<b>${avgKmPerL} km/L</b>，<b>${avgLPer100km} L/100km</b>`;
   }
 
+  // 清除所有數據
   function clearData() {
     if (confirm("確定要清除所有資料嗎？")) {
       history = [];
@@ -136,6 +149,7 @@
     }
   }
 
+  // 匯出 CSV
   function exportCSV() {
     let csv = "日期,公里,公升,km/L,L/100km,$/km\n";
     history.forEach(r => {
@@ -148,10 +162,12 @@
     link.click();
   }
 
+  // 匯入 CSV
   function importCSV() {
     document.getElementById('csvFile').click();
   }
 
+  // 處理匯入的 CSV
   function handleImport(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -161,7 +177,7 @@
       const lines = e.target.result.split('\n').slice(1);
       lines.forEach(line => {
         const [date, distance, fuel, kmPerL, LPer100km, costPerKm] = line.split(',');
-        if (date && distance) {
+        if (date && !isNaN(distance) && !isNaN(fuel)) {
           history.push({
             date,
             distance: parseFloat(distance),
@@ -188,3 +204,8 @@
   // Service Worker 註冊
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('service-worker.js')
+      .then(function(registration) {
+        console.log('Service Worker註冊成功:', registration);
+      })
+      .catch(function(error) {
+        console.log('Service Worker註冊失敗:', error);
